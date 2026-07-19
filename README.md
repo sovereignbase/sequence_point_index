@@ -1,2 +1,2 @@
 # uuid_map
-Why use linear, binary, or hash-based lookup strategies for addresses that are already unique?
+Brings significant performance benefits to runtimes that use UUIDs as addresses for storing data. 
