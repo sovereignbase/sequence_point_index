@@ -8,33 +8,38 @@
 #include <stdexcept>
 #include <string>
 
-void write_from_another_translation_unit(std::uint64_t actor_hi, std::uint32_t actor_lo,
-                                         std::uint32_t local_index, std::uint32_t value);
+void write_from_another_translation_unit(std::uint32_t actor_0, std::uint32_t actor_1,
+                                         std::uint32_t actor_2, std::uint32_t local_index,
+                                         std::uint32_t value);
 
 namespace {
 
 namespace map = sovereignbase::uuid_map;
 
 struct point {
-  std::uint64_t actor_hi;
-  std::uint32_t actor_lo;
+  std::uint32_t actor_0;
+  std::uint32_t actor_1;
+  std::uint32_t actor_2;
   std::uint32_t local_index;
 };
 
-[[nodiscard]] point key(std::uint64_t actor_hi, std::uint32_t actor_lo,
+[[nodiscard]] point key(std::uint32_t actor_0, std::uint32_t actor_1, std::uint32_t actor_2,
                         std::uint32_t local_index) noexcept {
-  return {actor_hi, actor_lo, local_index};
+  return {actor_0, actor_1, actor_2, local_index};
 }
 
 [[nodiscard]] std::uint32_t read(point value) noexcept {
-  return map::read(value.actor_hi, value.actor_lo, value.local_index);
+  return map::read(value.actor_0, value.actor_1, value.actor_2, value.local_index);
 }
 
 void write(point destination, std::uint32_t value) {
-  map::write(destination.actor_hi, destination.actor_lo, destination.local_index, value);
+  map::write(destination.actor_0, destination.actor_1, destination.actor_2, destination.local_index,
+             value);
 }
 
-void remove(point value) { map::remove(value.actor_hi, value.actor_lo, value.local_index); }
+void remove(point value) {
+  map::remove(value.actor_0, value.actor_1, value.actor_2, value.local_index);
+}
 
 [[noreturn]] void fail(const char* expression, int line) {
   throw std::runtime_error(std::string("line ") + std::to_string(line) +
@@ -48,8 +53,8 @@ void remove(point value) { map::remove(value.actor_hi, value.actor_lo, value.loc
   } while (false)
 
 void basic_operations() {
-  const auto first = key(1, 2, 3);
-  const auto second = key(1, 2, 4);
+  const auto first = key(1, 2, 3, 4);
+  const auto second = key(1, 2, 3, 5);
   write(first, 10);
   write(second, 20);
   CHECK(read(first) == 10);
@@ -63,8 +68,9 @@ void basic_operations() {
 }
 
 void shared_state() {
-  const auto shared = key(7, 8, 9);
-  write_from_another_translation_unit(shared.actor_hi, shared.actor_lo, shared.local_index, 42);
+  const auto shared = key(7, 8, 9, 10);
+  write_from_another_translation_unit(shared.actor_0, shared.actor_1, shared.actor_2,
+                                      shared.local_index, 42);
   CHECK(read(shared) == 42);
   remove(shared);
 }
@@ -75,50 +81,62 @@ void actors_and_indices() {
 
   for (std::size_t actor = 0; actor < actors; ++actor)
     for (std::size_t index = 0; index < indices; ++index)
-      write(key(actor * UINT64_C(0x9e3779b97f4a7c15), std::uint32_t(actor), std::uint32_t(index)),
+      write(key(std::uint32_t(actor), std::uint32_t(actor * 17), std::uint32_t(actor * 31),
+                std::uint32_t(index)),
             std::uint32_t(actor ^ index));
 
   for (std::size_t actor = 0; actor < actors; ++actor)
     for (std::size_t index = 0; index < indices; ++index)
-      CHECK(read(key(actor * UINT64_C(0x9e3779b97f4a7c15), std::uint32_t(actor),
+      CHECK(read(key(std::uint32_t(actor), std::uint32_t(actor * 17), std::uint32_t(actor * 31),
                      std::uint32_t(index))) == std::uint32_t(actor ^ index));
 
   for (std::size_t actor = 0; actor < actors; ++actor)
     for (std::size_t index = indices; index-- > 0;)
-      remove(key(actor * UINT64_C(0x9e3779b97f4a7c15), std::uint32_t(actor), std::uint32_t(index)));
+      remove(key(std::uint32_t(actor), std::uint32_t(actor * 17), std::uint32_t(actor * 31),
+                 std::uint32_t(index)));
 }
 
 void collision_chains() {
+  const auto first = key(1, 2, 3, 17);
+  const auto second = key(1, 3, 2, 17);
+  write(first, 1);
+  write(second, 2);
+  CHECK(read(first) == 1);
+  CHECK(read(second) == 2);
+  remove(first);
+  remove(second);
+
   constexpr std::size_t count = 96;
   for (std::size_t actor = 0; actor < count; ++actor)
-    write(key(actor, std::uint32_t(actor), 0), std::uint32_t(actor + 1));
+    write(key(std::uint32_t(actor), std::uint32_t(actor), 0, 0), std::uint32_t(actor + 1));
 
   for (std::size_t actor = 0; actor < 64; ++actor)
-    remove(key(actor, std::uint32_t(actor), 0));
+    remove(key(std::uint32_t(actor), std::uint32_t(actor), 0, 0));
   for (std::size_t actor = 64; actor < count; ++actor)
-    CHECK(read(key(actor, std::uint32_t(actor), 0)) == actor + 1);
+    CHECK(read(key(std::uint32_t(actor), std::uint32_t(actor), 0, 0)) == actor + 1);
   for (std::size_t actor = 64; actor < count; ++actor)
-    remove(key(actor, std::uint32_t(actor), 0));
+    remove(key(std::uint32_t(actor), std::uint32_t(actor), 0, 0));
 }
 
 void value_storage_shrink() {
   constexpr std::size_t count = 4096;
-  const auto actor = key(UINT64_C(0x123456789abcdef0), UINT32_C(0x12345678), 0);
+  const auto actor = key(UINT32_C(0x12345678), UINT32_C(0x9abcdef0), UINT32_C(0x12345678), 0);
 
   for (std::size_t index = 0; index < count; ++index)
-    write(key(actor.actor_hi, actor.actor_lo, std::uint32_t(index)), std::uint32_t(index));
+    write(key(actor.actor_0, actor.actor_1, actor.actor_2, std::uint32_t(index)),
+          std::uint32_t(index));
 
-  std::size_t slot = map::detail::find(actor.actor_hi, actor.actor_lo);
+  std::size_t slot = map::detail::find(actor.actor_0, actor.actor_1, actor.actor_2);
   const std::size_t capacity_before = map::detail::metadata[slot].capacity;
   for (std::size_t index = count; index-- > 64;)
-    remove(key(actor.actor_hi, actor.actor_lo, std::uint32_t(index)));
+    remove(key(actor.actor_0, actor.actor_1, actor.actor_2, std::uint32_t(index)));
 
-  slot = map::detail::find(actor.actor_hi, actor.actor_lo);
+  slot = map::detail::find(actor.actor_0, actor.actor_1, actor.actor_2);
   CHECK(map::detail::metadata[slot].capacity < capacity_before);
   for (std::size_t index = 0; index < 64; ++index)
-    CHECK(read(key(actor.actor_hi, actor.actor_lo, std::uint32_t(index))) == index);
+    CHECK(read(key(actor.actor_0, actor.actor_1, actor.actor_2, std::uint32_t(index))) == index);
   for (std::size_t index = 0; index < 64; ++index)
-    remove(key(actor.actor_hi, actor.actor_lo, std::uint32_t(index)));
+    remove(key(actor.actor_0, actor.actor_1, actor.actor_2, std::uint32_t(index)));
 }
 
 void stress() {
@@ -132,7 +150,7 @@ void stress() {
     random ^= random >> 7;
     random ^= random << 17;
     const std::size_t i = std::size_t(random % count);
-    const auto point = key(i % 17, std::uint32_t(i % 17), std::uint32_t(i / 17));
+    const auto point = key(std::uint32_t(i % 17), std::uint32_t(i % 17), 0, std::uint32_t(i / 17));
 
     if ((random >> 16) % 3 == 0) {
       values[i] = std::uint32_t(random);
@@ -148,7 +166,7 @@ void stress() {
 
   for (std::size_t i = 0; i < count; ++i)
     if (present[i])
-      remove(key(i % 17, std::uint32_t(i % 17), std::uint32_t(i / 17)));
+      remove(key(std::uint32_t(i % 17), std::uint32_t(i % 17), 0, std::uint32_t(i / 17)));
 }
 
 } // namespace

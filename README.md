@@ -3,7 +3,8 @@
 A header-only, zero-dependency C++ registry for 128-bit sequence-point addresses:
 
 ```text
-[ 64-bit actor high ][ 32-bit actor low ][ 32-bit local index ]
+[ actor word 0 ][ actor word 1 ][ actor word 2 ][ local index ]
+       32-bit          32-bit          32-bit          32-bit
 ```
 
 > Why hash ten million addresses when only their actors need lookup?
@@ -13,9 +14,9 @@ A header-only, zero-dependency C++ registry for 128-bit sequence-point addresses
 
 namespace uuid_map = sovereignbase::uuid_map;
 
-uuid_map::write(actor_hi, actor_lo, local_index, 42);
-const std::uint32_t value = uuid_map::read(actor_hi, actor_lo, local_index);
-uuid_map::remove(actor_hi, actor_lo, local_index);
+uuid_map::write(actor_0, actor_1, actor_2, local_index, 42);
+const std::uint32_t value = uuid_map::read(actor_0, actor_1, actor_2, local_index);
+uuid_map::remove(actor_0, actor_1, actor_2, local_index);
 ```
 
 There is no map object, key wrapper, template, handle, optional, or status object. C++17 inline
@@ -24,17 +25,20 @@ state provides one registry shared by all translation units in the linked progra
 ## API
 
 ```cpp
-std::uint32_t read(std::uint64_t actor_hi,
-                   std::uint32_t actor_lo,
+std::uint32_t read(std::uint32_t actor_0,
+                   std::uint32_t actor_1,
+                   std::uint32_t actor_2,
                    std::uint32_t local_index) noexcept;
 
-void write(std::uint64_t actor_hi,
-           std::uint32_t actor_lo,
+void write(std::uint32_t actor_0,
+           std::uint32_t actor_1,
+           std::uint32_t actor_2,
            std::uint32_t local_index,
            std::uint32_t value);
 
-void remove(std::uint64_t actor_hi,
-            std::uint32_t actor_lo,
+void remove(std::uint32_t actor_0,
+            std::uint32_t actor_1,
+            std::uint32_t actor_2,
             std::uint32_t local_index);
 ```
 
@@ -99,7 +103,9 @@ ctest --preset release
 ./build/release/benchmarks/uuid_map_benchmark
 ```
 
-The benchmark reports only nanoseconds per operation from 1 through 10 million IDs. Its workload
-and reproducibility notes are documented in [benchmarks/README.md](benchmarks/README.md).
+The benchmark reports nanoseconds per operation from 1,000 through 10 million IDs and compares
+`uuid_map` with ankerl, Boost, `std::unordered_map`, and C++23 `std::flat_map`. Its workload,
+dependency isolation, and reproducibility notes are documented in
+[benchmarks/README.md](benchmarks/README.md).
 
 Licensed under the Apache License 2.0.
