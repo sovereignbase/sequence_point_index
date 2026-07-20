@@ -1,4 +1,4 @@
-# uuid_map
+# sequence_point_index
 
 A header-only, zero-dependency C++ registry for 128-bit sequence-point addresses:
 
