@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC / Linux
+            os: ubuntu-latest
+            cxx: g++
+          - name: Clang / Linux
+            os: ubuntu-latest
+            cxx: clang++
+          - name: AppleClang / macOS
+            os: macos-latest
+            cxx: clang++
+          - name: MSVC / Windows
+            os: windows-latest
+            cxx: ""
+
+    env:
+      CXX: ${{ matrix.cxx }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DUUID_MAP_BUILD_TESTS=ON
+          -DUUID_MAP_BUILD_BENCHMARKS=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Install package
+        run: cmake --install build --config Release --prefix install
+
+  benchmark-build:
+    name: Benchmark build / Clang
+    runs-on: ubuntu-latest
+    env:
+      CXX: clang++
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DUUID_MAP_BUILD_TESTS=OFF
+          -DUUID_MAP_BUILD_BENCHMARKS=ON
+          -DUUID_MAP_INSTALL=OFF
+
+      - name: Build benchmark
+        run: cmake --build build --config Release --target uuid_map_benchmark --parallel
+
+  sanitizers:
+    name: Address and undefined behavior sanitizers
+    runs-on: ubuntu-latest
+    env:
+      CXX: clang++
+      CXXFLAGS: -fsanitize=address,undefined -fno-omit-frame-pointer
+      LDFLAGS: -fsanitize=address,undefined
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Debug
+          -DUUID_MAP_BUILD_TESTS=ON
+          -DUUID_MAP_BUILD_BENCHMARKS=OFF
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
